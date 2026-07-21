@@ -78,11 +78,23 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 | Ação | Como |
 |---|---|
 | Criar pasta (categoria) | **Nova pasta** na barra lateral |
+| Criar subpasta | Botão **Subpasta** dentro de uma pasta (navegue pelo *breadcrumb*) |
 | Enviar PDF | Botão **Enviar PDF** (arrastar e soltar funciona) |
-| Buscar | Campo de busca acima da lista de arquivos |
+| Ver em lista ou catálogo | Alternador no canto direito da busca |
+| Selecionar vários | Botão **Selecionar** → mover/excluir em massa |
+| Buscar | Campo de busca acima da lista |
 | Ler | Toque no arquivo — o leitor reabre na última página lida |
 | Renomear / Mover / Excluir | Ícones que aparecem ao passar o mouse na linha do arquivo |
+| Histórico | Aba **Histórico** — registro de leitura e ações (salvo no dispositivo) |
+| Insights | Aba **Insights** — progresso de leitura, PDFs por pasta, armazenamento |
 | Tema claro/escuro | Ícone de sol no topo (salvo no dispositivo) |
+
+> **Subpastas & RLS:** as subpastas são apenas prefixos mais profundos
+> (`{user_id}/pasta/subpasta/arquivo.pdf`). As políticas do README continuam
+> válidas, pois checam sempre o **primeiro** segmento do caminho (o seu ID).
+>
+> O histórico, o progresso de leitura e a preferência de layout ficam no
+> dispositivo (localStorage); os arquivos e pastas vêm do Supabase.
 
 ---
 
