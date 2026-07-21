@@ -85,6 +85,7 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 | Buscar | Campo de busca acima da lista |
 | Ler | Toque no arquivo — leitor de **rolagem contínua** (como um PDF comum), **texto selecionável**, reabre na última página lida |
 | Notas | Painel lateral no leitor (ícone de balão) — notas, resumos e citações, salvos automaticamente |
+| Traduzir | Selecione um trecho no PDF → botão **Traduzir** (detecta o idioma, traduz para PT); copiar ou enviar às notas |
 | Renomear / Mover / Excluir | Ícones que aparecem ao passar o mouse na linha do arquivo |
 | Histórico | Aba **Histórico** — registro de leitura e ações (salvo no dispositivo) |
 | Insights | Aba **Insights** — progresso de leitura, PDFs por pasta, armazenamento |
