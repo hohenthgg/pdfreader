@@ -799,13 +799,30 @@ document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click', ()
 /* ============================================================
    PASTAS RAIZ (sidebar)
    ============================================================ */
+/* Percorre um prefixo recursivamente (inclui subpastas) e soma PDFs + bytes */
+async function scanFolder(prefix, depth){
+  depth = depth || 0;
+  let count = 0, size = 0;
+  const { data } = await sb.storage.from(BUCKET).list(prefix, { limit: 1000 });
+  const subs = [];
+  for(const e of (data||[])){
+    if(e.name === PLACEHOLDER) continue;
+    if(e.id === null) subs.push(`${prefix}/${e.name}`);
+    else { count++; size += e.metadata?.size || 0; }
+  }
+  if(depth < 8 && subs.length){
+    const results = await Promise.all(subs.map(s=>scanFolder(s, depth+1)));
+    results.forEach(r=>{ count += r.count; size += r.size; });
+  }
+  return { count, size };
+}
 async function loadTopFolders(){
   const { data, error } = await sb.storage.from(BUCKET).list(S.user.id, { limit: 500 });
   if(error){ toast('Erro ao listar pastas', true); console.error(error); return; }
-  S.topFolders = (data||[]).filter(e=>e.id===null).map(e=>({ name:e.name, count:null }));
+  S.topFolders = (data||[]).filter(e=>e.id===null).map(e=>({ name:e.name, count:null, size:0 }));
   await Promise.all(S.topFolders.map(async f=>{
-    const { data: fs } = await sb.storage.from(BUCKET).list(`${S.user.id}/${f.name}`, { limit: 1000 });
-    f.count = (fs||[]).filter(x=>x.name!==PLACEHOLDER && x.id!==null).length;
+    const r = await scanFolder(`${S.user.id}/${f.name}`);   // recursivo: conta subpastas também
+    f.count = r.count; f.size = r.size;
   }));
   S.topFolders.sort((a,b)=>a.name.localeCompare(b.name));
   renderSidebar();
@@ -1185,16 +1202,15 @@ $('clear-hist-btn').addEventListener('click', ()=>{
 async function loadInsights(){
   const el = $('ins-scroll');
   el.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
-  // agrega tamanho/contagem por pasta raiz (um nível)
+  // agrega tamanho/contagem por pasta raiz — recursivo (inclui subpastas)
   let totalFiles = 0, totalSize = 0;
   const perFolder = [];
-  for(const f of S.topFolders){
-    const { data } = await sb.storage.from(BUCKET).list(`${S.user.id}/${f.name}`, { limit: 1000 });
-    const files = (data||[]).filter(x=>x.name!==PLACEHOLDER && x.id!==null);
-    const size = files.reduce((s,x)=>s+(x.metadata?.size||0),0);
-    totalFiles += files.length; totalSize += size;
-    perFolder.push({ name:f.name, count:files.length, size });
-  }
+  await Promise.all(S.topFolders.map(async f=>{
+    const r = await scanFolder(`${S.user.id}/${f.name}`);
+    perFolder.push({ name:f.name, count:r.count, size:r.size });
+  }));
+  perFolder.sort((a,b)=>a.name.localeCompare(b.name));
+  perFolder.forEach(f=>{ totalFiles += f.count; totalSize += f.size; });
   const reads = allReads();
   const inProgress = reads.filter(r=>r.pages && r.page < r.pages).length;
   const finished = reads.filter(r=>r.pages && r.page >= r.pages).length;
