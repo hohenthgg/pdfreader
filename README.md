@@ -53,14 +53,14 @@ Sem sessão válida, nada é acessível — o bucket é privado e não há polí
 
 ## 4. Configurar as credenciais no app
 
-Em **Project Settings → API**, copie a **Project URL** e a chave **anon public**. Abra o `index.html` e edite o bloco `CONFIG`:
+Em **Project Settings → API Keys**, copie a **Project URL** e a **publishable key** (`sb_publishable_...`). Abra o `index.html` e edite o bloco `CONFIG`:
 
 ```js
 const SUPABASE_URL = 'https://xxxx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJ...';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_...';
 ```
 
-> A chave *anon* é feita para ficar no frontend — ela não dá acesso a nada por si só. Quem protege os arquivos são as políticas RLS acima. Nunca use a chave `service_role` no frontend.
+> A *publishable key* é feita para ficar no frontend — ela não dá acesso a nada por si só. Quem protege os arquivos são as políticas RLS acima. Nunca use a `secret key` (`sb_secret_...`) nem a `service_role` no frontend.
 
 ## 5. Publicar no GitHub Pages
 

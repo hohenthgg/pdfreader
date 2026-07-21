@@ -624,15 +624,15 @@ window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/aj
 'use strict';
 /* ============================================================
    CONFIG — preencha com os dados do SEU projeto Supabase.
-   A chave "anon" é pública por natureza: a segurança vem das
-   políticas RLS do bucket (ver README).
+   A "publishable key" (sb_publishable_...) é pública por natureza:
+   a segurança vem das políticas RLS do bucket (ver README).
    ============================================================ */
 const SUPABASE_URL = 'https://SEU-PROJETO.supabase.co';
-const SUPABASE_ANON_KEY = 'SUA-CHAVE-ANON-PUBLICA';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_OwKMBEqT1m9tUQ9s6vbtVQ__Zzt0gwl';
 const BUCKET = 'pdfs';
 const PLACEHOLDER = '.keep';
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 /* ============================================================
    ESTADO
