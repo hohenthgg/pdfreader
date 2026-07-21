@@ -1024,10 +1024,12 @@ async function openViewer(name){
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
     const saved = parseInt(localStorage.getItem('lastpage:' + path)) || 1;
+    const fit = window.innerWidth < 768;
     S.viewer = {
       pdfDoc,
       pageNum: Math.min(saved, pdfDoc.numPages),
-      scale: window.innerWidth < 768 ? 0 : 1.2,  // 0 = ajustar à largura
+      scale: fit ? 0 : 1.2,  // 0 = ajustar à largura
+      fit,                    // mantém o modo "ajustar à largura" ao girar a tela
       rotation: 0, path, blob, name,
     };
     $('v-title').textContent = name.replace(/\.pdf$/i,'');
@@ -1052,14 +1054,16 @@ async function renderPage(){
     scale = ($('v-body').clientWidth - 24) / base.width;
     v.scale = scale;
   }
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Renderiza na densidade real do dispositivo (até 3×) para máxima nitidez em telas retina/celular
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
   const viewport = page.getViewport({ scale: scale * dpr, rotation: v.rotation });
   const canvas = $('pdf-canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
   canvas.style.width = (viewport.width / dpr) + 'px';
   canvas.style.height = (viewport.height / dpr) + 'px';
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  await page.render({ canvasContext: ctx, viewport }).promise;
   $('v-zoom').textContent = Math.round(scale * 83) + '%';
   localStorage.setItem('lastpage:' + v.path, v.pageNum);
 }
@@ -1074,8 +1078,8 @@ function gotoPage(n){
 $('v-prev').addEventListener('click', ()=>gotoPage(S.viewer.pageNum - 1));
 $('v-next').addEventListener('click', ()=>gotoPage(S.viewer.pageNum + 1));
 $('v-page-input').addEventListener('change', e=>gotoPage(parseInt(e.target.value) || 1));
-$('v-zoom-in').addEventListener('click', ()=>{ S.viewer.scale = Math.min(3, S.viewer.scale + 0.2); renderPage(); });
-$('v-zoom-out').addEventListener('click', ()=>{ S.viewer.scale = Math.max(0.4, S.viewer.scale - 0.2); renderPage(); });
+$('v-zoom-in').addEventListener('click', ()=>{ S.viewer.fit = false; S.viewer.scale = Math.min(4, S.viewer.scale + 0.2); renderPage(); });
+$('v-zoom-out').addEventListener('click', ()=>{ S.viewer.fit = false; S.viewer.scale = Math.max(0.4, S.viewer.scale - 0.2); renderPage(); });
 $('v-download').addEventListener('click', ()=>{
   const v = S.viewer;
   const url = URL.createObjectURL(v.blob);
@@ -1094,6 +1098,13 @@ document.addEventListener('keydown', e=>{
   if(e.key === 'ArrowLeft') gotoPage(S.viewer.pageNum - 1);
   if(e.key === 'ArrowRight') gotoPage(S.viewer.pageNum + 1);
   if(e.key === 'Escape') $('v-close').click();
+});
+// Re-ajusta à largura ao girar/redimensionar a tela (mantém nitidez no modo "fit")
+let resizeT;
+window.addEventListener('resize', ()=>{
+  if(!$('viewer').classList.contains('open') || !S.viewer.pdfDoc || !S.viewer.fit) return;
+  clearTimeout(resizeT);
+  resizeT = setTimeout(()=>{ S.viewer.scale = 0; renderPage(); }, 200);
 });
 
 /* ============================================================
