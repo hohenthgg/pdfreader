@@ -10,6 +10,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- pdf-lib (otimização de PDFs grandes no envio) -->
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -351,6 +353,12 @@ html[data-theme="dark"] .backdrop{background:rgba(0,0,0,.62);}
 .v-page{position:relative;background:#fff;border-radius:3px;box-shadow:0 6px 26px rgba(0,0,0,.22);max-width:100%;flex-shrink:0;}
 .v-page canvas{display:block;width:100%;height:100%;border-radius:3px;}
 .v-page .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+/* camada de texto selecionável (PDF.js) */
+.textLayer{position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;line-height:1;opacity:1;text-align:initial;forced-color-adjust:none;z-index:2;}
+.textLayer span,.textLayer br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0 0;}
+.textLayer ::selection{background:rgba(91,75,230,.32);}
+html[data-theme="dark"] .textLayer ::selection{background:rgba(139,131,245,.38);}
+.textLayer .endOfContent{display:block;position:absolute;inset:0;z-index:-1;cursor:default;user-select:none;}
 .v-page .ph .spinner{width:24px;height:24px;border-width:2px;}
 .v-page .pn{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
 /* progresso de carregamento */
@@ -1116,6 +1124,24 @@ $('drop').addEventListener('dragover', e=>{ e.preventDefault(); $('drop').classL
 $('drop').addEventListener('dragleave', ()=>$('drop').classList.remove('over'));
 $('drop').addEventListener('drop', e=>{ e.preventDefault(); $('drop').classList.remove('over'); uploadFiles([...e.dataTransfer.files]); });
 $('file-input').addEventListener('change', e=>{ uploadFiles([...e.target.files]); e.target.value=''; });
+
+const COMPRESS_THRESHOLD = 5 * 1024 * 1024;   // 5 MB
+const COMPRESS_MAX = 90 * 1024 * 1024;        // acima disso, não processa no navegador
+/* Otimização lossless com pdf-lib (reescreve com object streams). Mantém o texto
+   selecionável; só usa o resultado se for de fato menor. Retorna {blob, saved}. */
+async function optimizePdf(file){
+  if(typeof PDFLib === 'undefined' || file.size > COMPRESS_MAX) return { blob:file, saved:0 };
+  try{
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const doc = await PDFLib.PDFDocument.load(bytes, { updateMetadata:false, ignoreEncryption:true });
+    const out = await doc.save({ useObjectStreams:true });
+    if(out.byteLength < bytes.byteLength * 0.96){
+      return { blob: new Blob([out], { type:'application/pdf' }), saved: 1 - out.byteLength/bytes.byteLength };
+    }
+  }catch(e){ console.warn('otimização falhou, enviando original', e); }
+  return { blob:file, saved:0 };
+}
+
 async function uploadFiles(files){
   const pdfs = files.filter(f=>f.type==='application/pdf' || /\.pdf$/i.test(f.name));
   if(!pdfs.length){ toast('Apenas arquivos PDF', true); return; }
@@ -1126,9 +1152,19 @@ async function uploadFiles(files){
     item.className = 'up-item';
     item.innerHTML = `<span class="up-name">${escHtml(name)}</span><span class="st">enviando…</span>`;
     list.appendChild(item);
-    const { error } = await sb.storage.from(BUCKET).upload(pathOfFile(name), file, { contentType:'application/pdf', upsert:false });
-    if(error){ item.classList.add('err'); item.querySelector('.st').textContent = error.message?.includes('exists') ? 'já existe' : 'erro'; }
-    else { item.classList.add('ok'); item.querySelector('.st').textContent = 'enviado'; logActivity('envio', name); }
+    const st = item.querySelector('.st');
+
+    let payload = file, savedTxt = '';
+    if(file.size > COMPRESS_THRESHOLD){
+      st.textContent = 'compactando…';
+      const { blob, saved } = await optimizePdf(file);
+      payload = blob;
+      if(saved > 0) savedTxt = ` (−${Math.round(saved*100)}%)`;
+    }
+    st.textContent = 'enviando…';
+    const { error } = await sb.storage.from(BUCKET).upload(pathOfFile(name), payload, { contentType:'application/pdf', upsert:false });
+    if(error){ item.classList.add('err'); st.textContent = error.message?.includes('exists') ? 'já existe' : 'erro'; }
+    else { item.classList.add('ok'); st.textContent = 'enviado' + savedTxt; logActivity('envio', name); }
   }
   await loadEntries(); await loadTopFolders();
 }
@@ -1414,7 +1450,23 @@ async function renderPageInto(el, pageNum){
     canvas.width = Math.floor(viewport.width); canvas.height = Math.floor(viewport.height);
     canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px';
     await page.render({ canvasContext: canvas.getContext('2d', { alpha:false }), viewport }).promise;
-    if(v.rendered.has(pageNum)){ el.innerHTML=''; el.appendChild(canvas); const pn=document.createElement('div'); pn.className='pn'; pn.textContent=pageNum; el.appendChild(pn); }
+    if(!v.rendered.has(pageNum)) return;   // liberada durante o render
+    el.innerHTML = '';
+    el.appendChild(canvas);
+    // camada de texto selecionável (sobre o canvas)
+    try{
+      const cssVp = page.getViewport({ scale: cssScale });
+      const tl = document.createElement('div');
+      tl.className = 'textLayer';
+      tl.style.width = cssW + 'px'; tl.style.height = cssH + 'px';
+      tl.style.setProperty('--scale-factor', cssScale);
+      el.appendChild(tl);
+      const tc = await page.getTextContent();
+      if(v.rendered.has(pageNum)){
+        await pdfjsLib.renderTextLayer({ textContentSource: tc, container: tl, viewport: cssVp, textDivs: [] }).promise;
+      } else { tl.remove(); }
+    }catch(e){ /* PDF sem camada de texto (ex.: escaneado) — segue só com a imagem */ }
+    const pn = document.createElement('div'); pn.className='pn'; pn.textContent=pageNum; el.appendChild(pn);
   } catch(err){ v.rendered.delete(pageNum); }
 }
 function freePage(el, pageNum){

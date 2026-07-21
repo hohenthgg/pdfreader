@@ -83,7 +83,7 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 | Ver em lista ou catálogo | Alternador no canto direito da busca |
 | Selecionar vários | Botão **Selecionar** → mover/excluir em massa |
 | Buscar | Campo de busca acima da lista |
-| Ler | Toque no arquivo — leitor de **rolagem contínua** (como um PDF comum), reabre na última página lida |
+| Ler | Toque no arquivo — leitor de **rolagem contínua** (como um PDF comum), **texto selecionável**, reabre na última página lida |
 | Notas | Painel lateral no leitor (ícone de balão) — notas, resumos e citações, salvos automaticamente |
 | Renomear / Mover / Excluir | Ícones que aparecem ao passar o mouse na linha do arquivo |
 | Histórico | Aba **Histórico** — registro de leitura e ações (salvo no dispositivo) |
@@ -99,7 +99,14 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 >
 > **PDFs grandes:** o leitor abre por *streaming* (URL assinada + range
 > requests do PDF.js) e renderiza as páginas sob demanda conforme você rola —
-> por isso arquivos pesados abrem rápido, sem baixar tudo antes.
+> por isso arquivos pesados abrem rápido, sem baixar tudo antes. No **envio**,
+> arquivos acima de **5 MB** passam por uma otimização *lossless* (pdf-lib,
+> object streams) e sobe o menor entre o original e o otimizado — mantendo o
+> texto selecionável. O ganho varia: PDFs já otimizados/escaneados encolhem
+> pouco; nesses casos o original é mantido.
+>
+> **Texto selecionável** depende do PDF ter uma camada de texto real; PDFs
+> escaneados (imagem pura) não têm texto a selecionar.
 
 ---
 
