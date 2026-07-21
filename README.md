@@ -1,6 +1,8 @@
-# ANON·PDF — Biblioteca pessoal de PDFs
+# pdfReader — sua biblioteca de PDFs
 
 Frontend estático (um único `index.html`) que sincroniza seus PDFs entre PC e celular usando **Supabase Auth + Storage privado**. Sem backend próprio, sem banco de metadados: as pastas do Storage são as categorias.
+
+Interface minimalista e moderna, com tema claro/escuro, busca por arquivo e leitor de PDF embutido (PDF.js) que reabre na última página lida.
 
 O que fica no dispositivo (localStorage): tema, última pasta aberta e última página lida de cada PDF. Todo o resto vem do Supabase.
 
@@ -51,18 +53,18 @@ Sem sessão válida, nada é acessível — o bucket é privado e não há polí
 
 ## 4. Configurar as credenciais no app
 
-Em **Project Settings → API**, copie a **Project URL** e a chave **anon public**. Abra o `index.html` e edite o bloco `CONFIG`:
+Em **Project Settings → API Keys**, copie a **Project URL** e a **publishable key** (`sb_publishable_...`). Abra o `index.html` e edite o bloco `CONFIG`:
 
 ```js
 const SUPABASE_URL = 'https://xxxx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJ...';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_...';
 ```
 
-> A chave *anon* é feita para ficar no frontend — ela não dá acesso a nada por si só. Quem protege os arquivos são as políticas RLS acima. Nunca use a chave `service_role` no frontend.
+> A *publishable key* é feita para ficar no frontend — ela não dá acesso a nada por si só. Quem protege os arquivos são as políticas RLS acima. Nunca use a `secret key` (`sb_secret_...`) nem a `service_role` no frontend.
 
 ## 5. Publicar no GitHub Pages
 
-1. Crie um repositório e envie o `index.html` (e este README) para a branch `main`.
+1. Envie o `index.html` (e este README) para a branch `main`.
 2. No GitHub: **Settings → Pages → Source: Deploy from a branch → main / root → Save**.
 3. Em 1–2 minutos o app estará em `https://SEU-USUARIO.github.io/SEU-REPO/`.
 4. (Recomendado) No Supabase, em **Authentication → URL Configuration**, adicione essa URL em *Site URL*.
@@ -75,8 +77,18 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 
 | Ação | Como |
 |---|---|
-| Criar pasta (categoria) | "+ Nova pasta" na lateral |
+| Criar pasta (categoria) | **Nova pasta** na barra lateral |
 | Enviar PDF | Botão **Enviar PDF** (arrastar e soltar funciona) |
+| Buscar | Campo de busca acima da lista de arquivos |
 | Ler | Toque no arquivo — o leitor reabre na última página lida |
-| Renomear / Mover / Excluir | Ícones na linha do arquivo |
+| Renomear / Mover / Excluir | Ícones que aparecem ao passar o mouse na linha do arquivo |
 | Tema claro/escuro | Ícone de sol no topo (salvo no dispositivo) |
+
+---
+
+## Stack
+
+- **HTML/CSS/JS puro** — sem build, sem framework.
+- **[Supabase](https://supabase.com)** — Auth + Storage privado.
+- **[PDF.js](https://mozilla.github.io/pdf.js/)** — renderização do PDF no navegador.
+- **[Inter](https://rsms.me/inter/)** — tipografia.
