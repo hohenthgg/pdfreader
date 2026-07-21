@@ -83,7 +83,8 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 | Ver em lista ou catálogo | Alternador no canto direito da busca |
 | Selecionar vários | Botão **Selecionar** → mover/excluir em massa |
 | Buscar | Campo de busca acima da lista |
-| Ler | Toque no arquivo — o leitor reabre na última página lida |
+| Ler | Toque no arquivo — leitor de **rolagem contínua** (como um PDF comum), reabre na última página lida |
+| Notas | Painel lateral no leitor (ícone de balão) — notas, resumos e citações, salvos automaticamente |
 | Renomear / Mover / Excluir | Ícones que aparecem ao passar o mouse na linha do arquivo |
 | Histórico | Aba **Histórico** — registro de leitura e ações (salvo no dispositivo) |
 | Insights | Aba **Insights** — progresso de leitura, PDFs por pasta, armazenamento |
@@ -93,8 +94,12 @@ Abra a mesma URL no PC e no celular, entre com o mesmo e-mail/senha e a bibliote
 > (`{user_id}/pasta/subpasta/arquivo.pdf`). As políticas do README continuam
 > válidas, pois checam sempre o **primeiro** segmento do caminho (o seu ID).
 >
-> O histórico, o progresso de leitura e a preferência de layout ficam no
-> dispositivo (localStorage); os arquivos e pastas vêm do Supabase.
+> O histórico, o progresso de leitura, as **notas** e a preferência de layout
+> ficam no dispositivo (localStorage); os arquivos e pastas vêm do Supabase.
+>
+> **PDFs grandes:** o leitor abre por *streaming* (URL assinada + range
+> requests do PDF.js) e renderiza as páginas sob demanda conforme você rola —
+> por isso arquivos pesados abrem rápido, sem baixar tudo antes.
 
 ---
 
