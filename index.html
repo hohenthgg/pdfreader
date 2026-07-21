@@ -359,6 +359,16 @@ html[data-theme="dark"] .backdrop{background:rgba(0,0,0,.62);}
 .textLayer ::selection{background:rgba(91,75,230,.32);}
 html[data-theme="dark"] .textLayer ::selection{background:rgba(139,131,245,.38);}
 .textLayer .endOfContent{display:block;position:absolute;inset:0;z-index:-1;cursor:default;user-select:none;}
+/* popup de tradução da seleção */
+.sel-pop{position:fixed;z-index:80;display:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;max-width:min(360px,92vw);animation:pop .14s var(--ease);}
+.sel-pop.show{display:block;}
+.sel-pop .sp-loading{display:flex;align-items:center;gap:10px;padding:6px 8px;font-size:13px;color:var(--muted);}
+.sel-pop .sp-loading .spinner{width:18px;height:18px;border-width:2px;}
+.sel-pop .sp-lang{font-size:11px;color:var(--muted);padding:2px 8px 6px;font-weight:500;}
+.sel-pop .sp-out{font-size:14px;line-height:1.55;color:var(--ink);padding:2px 8px 10px;max-height:240px;overflow-y:auto;white-space:pre-wrap;}
+.sel-pop .sp-err{font-size:13px;color:var(--danger);padding:6px 8px;}
+.sel-pop .sp-actions{display:flex;gap:6px;padding-top:6px;border-top:1px solid var(--line);}
+.sel-pop .sp-actions .btn{height:32px;font-size:12.5px;flex:1;}
 .v-page .ph .spinner{width:24px;height:24px;border-width:2px;}
 .v-page .pn{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
 /* progresso de carregamento */
@@ -650,6 +660,7 @@ html[data-theme="dark"] .textLayer ::selection{background:rgba(139,131,245,.38);
       </div>
     </div>
   </div>
+  <div class="sel-pop" id="v-sel-pop"></div>
 </div>
 
 <div id="toasts"></div>
@@ -1551,6 +1562,106 @@ $('notes-copy').addEventListener('click', async ()=>{
 $('notes-clear').addEventListener('click', ()=>{
   $('notes-area').value=''; if(S.viewer) localStorage.removeItem('notes:'+S.viewer.path); $('notes-status').textContent='';
 });
+function appendToNotes(text){
+  if(!S.viewer) return;
+  const ta = $('notes-area');
+  ta.value = (ta.value ? ta.value.replace(/\s*$/,'') + '\n\n' : '') + text;
+  localStorage.setItem('notes:'+S.viewer.path, ta.value);
+  $('notes-status').textContent = 'salvo';
+  if($('v-notes').classList.contains('hidden')) $('v-notes-btn').click();
+}
+
+/* ============================================================
+   TRADUÇÃO DA SELEÇÃO
+   ============================================================ */
+const LANG_NAMES = { en:'inglês', pt:'português', 'pt-br':'português', es:'espanhol', fr:'francês', de:'alemão', it:'italiano', la:'latim', grc:'grego', el:'grego', ru:'russo', ja:'japonês', zh:'chinês', ar:'árabe', nl:'holandês' };
+let selText = '';
+const selPop = $('v-sel-pop');
+
+function getViewerSelection(){
+  const sel = window.getSelection();
+  if(!sel || sel.isCollapsed || sel.rangeCount===0) return null;
+  const text = sel.toString().trim();
+  if(text.length < 2) return null;
+  let node = sel.anchorNode;
+  if(node && node.nodeType===3) node = node.parentNode;
+  if(!node || !$('v-pages').contains(node)) return null;   // só seleção dentro das páginas
+  return { text, rect: sel.getRangeAt(0).getBoundingClientRect() };
+}
+function positionPop(rect){
+  selPop.classList.add('show');
+  const pw = selPop.offsetWidth, ph = selPop.offsetHeight;
+  let left = rect.left + rect.width/2 - pw/2;
+  left = Math.max(8, Math.min(window.innerWidth - pw - 8, left));
+  let top = rect.top - ph - 10;
+  if(top < 64) top = rect.bottom + 10;
+  top = Math.min(top, window.innerHeight - ph - 8);
+  selPop.style.left = left + 'px';
+  selPop.style.top = top + 'px';
+}
+function hideSelPop(){ selPop.classList.remove('show'); }
+function maybeShowSelPop(){
+  if(!$('viewer').classList.contains('open')) return;
+  const s = getViewerSelection();
+  if(!s){ hideSelPop(); return; }
+  selText = s.text;
+  selPop.innerHTML = '<button class="btn sm primary" id="sp-translate" style="height:34px;font-size:13px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M4 5h7M9 3v2c0 4-2 7-5 8"/><path d="M5 9c0 2 2 4 6 5"/><path d="M13 21l4-9 4 9M14.5 17h5"/></svg>Traduzir</button>';
+  positionPop(s.rect);
+  $('sp-translate').addEventListener('click', doTranslate);
+}
+async function translateText(text){
+  const q = text.slice(0, 4500);
+  // 1) Google (auto → pt), lida com trechos longos e detecta o idioma
+  try{
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=pt&dt=t&q=' + encodeURIComponent(q);
+    const res = await fetch(url);
+    if(res.ok){
+      const j = await res.json();
+      const out = (j[0] || []).map(seg=>seg[0]).join('');
+      if(out) return { text: out, src: j[2] || '' };
+    }
+  }catch(e){ /* tenta o próximo */ }
+  // 2) MyMemory (fallback, ~500 chars)
+  const url2 = 'https://api.mymemory.translated.net/get?langpair=en|pt-br&q=' + encodeURIComponent(q.slice(0, 480));
+  const res2 = await fetch(url2);
+  const j2 = await res2.json();
+  const out2 = j2 && j2.responseData && j2.responseData.translatedText;
+  if(out2) return { text: out2, src: 'en' };
+  throw new Error('translate failed');
+}
+async function doTranslate(){
+  const text = selText;
+  const rect = selPop.getBoundingClientRect();
+  selPop.innerHTML = '<div class="sp-loading"><div class="spinner"></div>Traduzindo…</div>';
+  selPop.style.top = (rect.top) + 'px';
+  try{
+    const r = await translateText(text);
+    const srcCode = (r.src||'').toLowerCase();
+    const langLabel = srcCode ? (LANG_NAMES[srcCode] || srcCode) : '';
+    const already = srcCode.startsWith('pt');
+    selPop.innerHTML =
+      (langLabel ? `<div class="sp-lang">${already?'Já está em português':'Traduzido do '+escHtml(langLabel)} →</div>` : '') +
+      `<div class="sp-out">${escHtml(r.text)}</div>` +
+      `<div class="sp-actions">
+         <button class="btn sm" id="sp-copy">Copiar</button>
+         <button class="btn sm" id="sp-note">→ Notas</button>
+         <button class="btn sm" id="sp-close">Fechar</button>
+       </div>`;
+    $('sp-copy').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(r.text); toast('Tradução copiada'); }catch(e){ toast('Não foi possível copiar', true); } });
+    $('sp-note').addEventListener('click', ()=>{ appendToNotes('“'+text+'”\n→ '+r.text); toast('Enviado às notas'); hideSelPop(); });
+    $('sp-close').addEventListener('click', hideSelPop);
+  }catch(e){
+    console.error(e);
+    selPop.innerHTML = '<div class="sp-err">Não foi possível traduzir agora. Verifique a conexão.</div>';
+  }
+}
+document.addEventListener('mouseup', (e)=>{
+  if(selPop.contains(e.target)) return;         // clique dentro do popup não recalcula
+  setTimeout(maybeShowSelPop, 10);
+});
+document.addEventListener('touchend', (e)=>{ if(selPop.contains(e.target)) return; setTimeout(maybeShowSelPop, 10); });
+document.addEventListener('mousedown', (e)=>{ if(!selPop.contains(e.target)) hideSelPop(); });
+$('v-scroll').addEventListener('scroll', hideSelPop, { passive:true });
 
 /* ---- download (busca sob demanda p/ preservar o nome) ---- */
 $('v-download').addEventListener('click', async ()=>{
@@ -1564,6 +1675,7 @@ $('v-download').addEventListener('click', async ()=>{
 
 $('v-close').addEventListener('click', closeViewer);
 function closeViewer(){
+  hideSelPop();
   $('viewer').classList.remove('open');
   const v = S.viewer;
   if(v){ v.observer?.disconnect?.(); v.pdfDoc?.destroy?.(); }
@@ -1574,6 +1686,7 @@ function closeViewer(){
 }
 document.addEventListener('keydown', e=>{
   if(!$('viewer').classList.contains('open')) return;
+  if(e.key==='Escape' && selPop.classList.contains('show')){ hideSelPop(); return; }
   if(e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA') return;
   if(e.key==='ArrowLeft' || e.key==='PageUp') { scrollToPage(S.viewer.curPage-1, true); e.preventDefault(); }
   if(e.key==='ArrowRight' || e.key==='PageDown'){ scrollToPage(S.viewer.curPage+1, true); e.preventDefault(); }
